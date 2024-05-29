@@ -18,7 +18,11 @@ public class KillBillMonetizationConstants {
             "WHERE API_ID = ? AND STRIPE_PRODUCT_ID = ?";
     public static final String GET_BILLING_PLAN_FOR_TIER = "SELECT STRIPE_PLAN_ID FROM AM_MONETIZATION " +
             "WHERE API_ID = ? AND TIER_NAME = ?";
+    public static final String GET_BILLING_PLAN_NAME= "SELECT TIER_ID FROM AM_SUBSCRIPTION " +
+            "WHERE API_ID = ?";
     public static final String INSERT_MONETIZATION_PLAN_DATA_SQL =
+            "INSERT INTO AM_POLICY_PLAN_MAPPING (POLICY_UUID, PRODUCT_ID, PLAN_ID) VALUES (?,?,?)";
+    public static final String GET_MONETIZATION_PLAN_ID =
             "INSERT INTO AM_POLICY_PLAN_MAPPING (POLICY_UUID, PRODUCT_ID, PLAN_ID) VALUES (?,?,?)";
     public static final String UPDATE_MONETIZATION_PLAN_ID_SQL = "UPDATE AM_POLICY_PLAN_MAPPING SET PLAN_ID = ? " +
             "WHERE POLICY_UUID = ? AND PRODUCT_ID = ?";

@@ -1,5 +1,6 @@
 package org.wso2.apim.monetization.impl;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.apimgt.api.APIManagementException;
@@ -9,7 +10,9 @@ import org.wso2.carbon.apimgt.impl.utils.APIMgtDBUtil;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Map;
 
 public class KillBillDAO {
@@ -53,7 +56,8 @@ public class KillBillDAO {
             APIMgtDBUtil.closeAllConnections(policyStatement, conn, null);
         }
     }
-    public void addMonetizationData(int apiId, String productId, Map<String, String> tierPlanMap)
+
+    public static void addMonetizationData(int apiId, String productId, Map<String, String> tierPlanMap)
             throws KillBillMonetizationException {
 
         PreparedStatement preparedStatement = null;
@@ -92,6 +96,156 @@ public class KillBillDAO {
         }
     }
 
+    /**
+     * This method is used to get the product id in the billing engine for a give API
+     *
+     * @param apiId API ID
+     * @return billing engine product ID of the give API
+     */
+    public static String getBillingEngineProductId(int apiId) throws KillBillMonetizationException {
+
+        String billingEngineProductId = null;
+        Connection connection = null;
+        PreparedStatement statement = null;
+        try {
+            connection = APIMgtDBUtil.getConnection();
+            connection.setAutoCommit(false);
+            statement = connection.prepareStatement(KillBillMonetizationConstants.GET_BILLING_ENGINE_PRODUCT_BY_API);
+            statement.setInt(1, apiId);
+            ResultSet rs = statement.executeQuery();
+            while (rs.next()) {
+                billingEngineProductId = rs.getString("STRIPE_PRODUCT_ID");
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            String errorMessage = "Failed to get billing engine product ID of API : " + apiId;
+            log.error(errorMessage);
+            throw new KillBillMonetizationException(errorMessage, e);
+        } finally {
+            APIMgtDBUtil.closeAllConnections(statement, connection, null);
+        }
+        return billingEngineProductId;
 
 
+    }
+
+    public static String getBillingEnginePlanIdForTier(int apiID, String tierName) throws KillBillMonetizationException {
+
+        Connection connection = null;
+        PreparedStatement statement = null;
+        String billingEnginePlanId = StringUtils.EMPTY;
+        try {
+            connection = APIMgtDBUtil.getConnection();
+            connection.setAutoCommit(false);
+            statement = connection.prepareStatement(KillBillMonetizationConstants.GET_BILLING_PLAN_FOR_TIER);
+            statement.setInt(1, apiID);
+            statement.setString(2, tierName);
+            ResultSet rs = statement.executeQuery();
+            while (rs.next()) {
+                billingEnginePlanId = rs.getString("STRIPE_PLAN_ID");
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            String errorMessage = "Failed to get billing plan ID tier : " + tierName;
+            log.error(errorMessage, e);
+            throw new KillBillMonetizationException(errorMessage, e);
+        } finally {
+            APIMgtDBUtil.closeAllConnections(statement, connection, null);
+        }
+        return billingEnginePlanId;
+    }
+    public static String getBillingEnginePlanId(int apiID) throws KillBillMonetizationException {
+
+        Connection connection = null;
+        PreparedStatement statement = null;
+        String billingEnginePlanId = StringUtils.EMPTY;
+        try {
+            connection = APIMgtDBUtil.getConnection();
+            connection.setAutoCommit(false);
+            statement = connection.prepareStatement(KillBillMonetizationConstants.GET_BILLING_PLAN_NAME);
+            statement.setInt(1, apiID);
+            ResultSet rs = statement.executeQuery();
+            while (rs.next()) {
+                billingEnginePlanId = rs.getString("TIER_ID");
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            String errorMessage = "Failed to get billing API ID tier : " + apiID;
+            log.error(errorMessage, e);
+            throw new KillBillMonetizationException(errorMessage, e);
+        } finally {
+            APIMgtDBUtil.closeAllConnections(statement, connection, null);
+        }
+        return billingEnginePlanId;
+    }
+
+    /**
+     * Get billing plan ID for a given tier
+     *
+     * @param tierUUID tier UUID
+     * @return billing plan ID for a given tier
+     * @throws KillBillMonetizationException if failed to get billing plan ID for a given tier
+     */
+    public static String getBillingPlanId(String tierUUID) throws KillBillMonetizationException {
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        String planId = null;
+        try {
+            conn = APIMgtDBUtil.getConnection();
+            conn.setAutoCommit(false);
+            ps = conn.prepareStatement(KillBillMonetizationConstants.GET_BILLING_PLAN_ID);
+            ps.setString(1, tierUUID);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                planId = rs.getString("PLAN_ID");
+            }
+        } catch (SQLException e) {
+            String errorMessage = "Error while getting stripe plan ID for tier UUID : " + tierUUID;
+            log.error(errorMessage);
+            throw new KillBillMonetizationException(errorMessage, e);
+        } finally {
+            APIMgtDBUtil.closeAllConnections(ps, conn, rs);
+        }
+        return planId;
+    }
+
+
+    /**
+     * This method is used to get stripe plan and tier mapping
+     *
+     * @param apiID           API ID
+     * @param stripeProductId stripe product ID
+     * @return mapping between tier and stripe plans
+     * @throws KillBillMonetizationException if failed to get mapping between tier and stripe plans
+     */
+    public static Map<String, String> getTierToBillingEnginePlanMapping(int apiID, String stripeProductId)
+            throws KillBillMonetizationException {
+
+        Map<String, String> stripePlanTierMap = new HashMap<String, String>();
+        Connection connection = null;
+        PreparedStatement statement = null;
+        try {
+            connection = APIMgtDBUtil.getConnection();
+            connection.setAutoCommit(false);
+            statement = connection.prepareStatement(KillBillMonetizationConstants.GET_BILLING_PLANS_BY_PRODUCT);
+            statement.setInt(1, apiID);
+            statement.setString(2, stripeProductId);
+            ResultSet rs = statement.executeQuery();
+            while (rs.next()) {
+                String tierName = rs.getString("TIER_NAME");
+                String stripePlanId = rs.getString("STRIPE_PLAN_ID");
+                stripePlanTierMap.put(tierName, stripePlanId);
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            String errorMessage = "Failed to get stripe plan and tier mapping for API : " + apiID;
+            log.error(errorMessage);
+            throw new KillBillMonetizationException(errorMessage, e);
+        } finally {
+            APIMgtDBUtil.closeAllConnections(statement, connection, null);
+        }
+        return stripePlanTierMap;
+    }
 }
